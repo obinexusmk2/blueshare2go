@@ -32,6 +32,7 @@ typedef enum {
     TOPOLOGY_STAR,
     TOPOLOGY_BUS,
     TOPOLOGY_MESH,
+    TOPOLOGY_TRIDENT,
     TOPOLOGY_HYBRID
 } network_topology_t;
 

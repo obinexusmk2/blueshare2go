@@ -74,12 +74,12 @@ echo "   Cost per MB: ${COST_PER_MB} microsatoshis"
 
 # Validate topology
 case ${TOPOLOGY} in
-    "star"|"bus"|"mesh"|"hybrid")
+    "star"|"bus"|"mesh"|"trident"|"hybrid")
         echo "✅ Valid topology: ${TOPOLOGY}"
         ;;
     *)
         echo "❌ Invalid topology: ${TOPOLOGY}"
-        echo "Valid options: star, bus, mesh, hybrid"
+        echo "Valid options: star, bus, mesh, trident, hybrid"
         exit 1
         ;;
 esac
