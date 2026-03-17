@@ -8,11 +8,11 @@ set(CONSTITUTIONAL_COMPLIANCE ON CACHE BOOL "Enable constitutional compliance ve
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# OBINexus Computing integration
+# OBINexus Computing integration (optional in local/dev environments)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GOSI_LANG REQUIRED gosi-lang)
-pkg_check_modules(NODE_ZERO REQUIRED node-zero)
-pkg_check_modules(LIBPOLYCALL REQUIRED libpolycall)
+pkg_check_modules(GOSI_LANG QUIET gosi-lang)
+pkg_check_modules(NODE_ZERO QUIET node-zero)
+pkg_check_modules(LIBPOLYCALL QUIET libpolycall)
 
 # Platform detection
 if(ANDROID)
@@ -51,23 +51,33 @@ set(BLUESHARE_CORE_SOURCES
 )
 
 # Platform-specific sources
-if(PLATFORM_ANDROID)
-    list(APPEND BLUESHARE_CORE_SOURCES src/android/android_platform.c)
-elseif(PLATFORM_IOS)
-    list(APPEND BLUESHARE_CORE_SOURCES src/ios/ios_platform.c)
-else()
+if(PLATFORM_LINUX)
     list(APPEND BLUESHARE_CORE_SOURCES src/platform/linux_platform.c)
+else()
+    message(STATUS "TODO: Android/iOS platform source files are not implemented yet.")
 endif()
 
 # Create core library
 add_library(blueshare_core SHARED ${BLUESHARE_CORE_SOURCES})
 
-# Link OBINexus Computing libraries
-target_link_libraries(blueshare_core
-    ${GOSI_LANG_LIBRARIES}
-    ${NODE_ZERO_LIBRARIES}
-    ${LIBPOLYCALL_LIBRARIES}
-)
+# Link OBINexus Computing libraries when available
+if(GOSI_LANG_FOUND)
+    target_link_libraries(blueshare_core ${GOSI_LANG_LIBRARIES})
+else()
+    message(STATUS "gosi-lang not found; building without it.")
+endif()
+
+if(NODE_ZERO_FOUND)
+    target_link_libraries(blueshare_core ${NODE_ZERO_LIBRARIES})
+else()
+    message(STATUS "node-zero not found; building without it.")
+endif()
+
+if(LIBPOLYCALL_FOUND)
+    target_link_libraries(blueshare_core ${LIBPOLYCALL_LIBRARIES})
+else()
+    message(STATUS "libpolycall not found; building without it.")
+endif()
 
 # Create CLI tool
 add_executable(blueshare_cli src/cli/blueshare_cli.c)
