@@ -59,7 +59,7 @@ typedef struct device_node {
     device_role_t role;
     
     // Bluetooth LE Properties
-    uint8_t rssi;                    // Signal strength
+    int8_t rssi;                     // Signal strength in dBm (typically negative)
     uint16_t mtu;                    // Max transmission unit
     
     // Network Statistics
@@ -120,6 +120,30 @@ typedef struct {
     payment_state_t status;
 } lightning_payment_t;
 
+#define RSSI_YES_THRESHOLD_DBM (-70)
+#define RSSI_NO_THRESHOLD_DBM  (-90)
+
+/**
+ * RSSI-to-consent mapping (table-driven policy):
+ *
+ * | RSSI range     | Consent |
+ * |----------------|---------|
+ * | rssi > -70 dBm | YES     |
+ * | rssi < -90 dBm | NO      |
+ * | otherwise      | MAYBE   |
+ */
+static trinary_state_t map_rssi_to_consent(int8_t rssi) {
+    if (rssi > RSSI_YES_THRESHOLD_DBM) {
+        return STATE_YES;
+    }
+
+    if (rssi < RSSI_NO_THRESHOLD_DBM) {
+        return STATE_NO;
+    }
+
+    return STATE_MAYBE;
+}
+
 // ============================================================================
 // NSIGII Consensus Functions
 // ============================================================================
@@ -132,16 +156,19 @@ trinary_state_t request_device_consent(device_node_t *device, const char *reques
     printf("[NSIGII] Requesting %s consent from device %s\n", request_type, device->device_name);
     
     // Simulate consent check (in real implementation, send BLE request)
-    // For demo: devices with good signal (RSSI > -70) accept, poor signal maybe
-    if (device->rssi > -70) {
-        device->consent_state.state = STATE_YES;
-        printf("[NSIGII] Device %s: YES (strong signal)\n", device->device_name);
-    } else if (device->rssi < -90) {
-        device->consent_state.state = STATE_NO;
-        printf("[NSIGII] Device %s: NO (weak signal)\n", device->device_name);
-    } else {
-        device->consent_state.state = STATE_MAYBE;
-        printf("[NSIGII] Device %s: MAYBE (marginal signal)\n", device->device_name);
+    device->consent_state.state = map_rssi_to_consent(device->rssi);
+    switch (device->consent_state.state) {
+        case STATE_YES:
+            printf("[NSIGII] Device %s: YES (strong signal)\n", device->device_name);
+            break;
+        case STATE_NO:
+            printf("[NSIGII] Device %s: NO (weak signal)\n", device->device_name);
+            break;
+        case STATE_MAYBE:
+            printf("[NSIGII] Device %s: MAYBE (marginal signal)\n", device->device_name);
+            break;
+        default:
+            break;
     }
     
     device->consent_state.timestamp = time(NULL);
@@ -441,7 +468,7 @@ int main() {
         .device_id = "dev-004-relay",
         .device_name = "Dave's Hotspot",
         .role = ROLE_RELAY,
-        .rssi = -95,  // Poor signal - will trigger MAYBE
+        .rssi = -95,  // Poor signal - will trigger NO
         .bytes_sent = 2097152,      // 2 MB
         .bytes_received = 1048576,  // 1 MB
         .next = NULL
