@@ -34,6 +34,7 @@ class NetworkTopology(Enum):
     STAR = "star"
     BUS = "bus"
     MESH = "mesh"
+    TRIDENT = "trident"
     HYBRID = "hybrid"
 
 
@@ -218,6 +219,11 @@ class BlueShareSession:
         print(f"\n[TOPOLOGY] Analyzing {len(self.devices)} devices...")
         
         host_count = sum(1 for d in self.devices if d.role == DeviceRole.HOST)
+        relay_count = sum(1 for d in self.devices if d.role == DeviceRole.RELAY)
+        trident_anchor_count = sum(
+            1 for d in self.devices
+            if d.role in (DeviceRole.HOST, DeviceRole.RELAY) and d.rssi >= -80
+        )
         
         if host_count == 0:
             print("[TOPOLOGY] ERROR: No hosts available")
@@ -227,6 +233,20 @@ class BlueShareSession:
         if len(self.devices) <= 3 and host_count == 1:
             print("[TOPOLOGY] Selected: STAR (optimal for small network)")
             return NetworkTopology.STAR
+        elif (
+            6 <= len(self.devices) <= 12
+            and host_count >= 2
+            and trident_anchor_count >= 3
+        ):
+            failover_budget = (trident_anchor_count - 1) + (1 if relay_count > 0 else 0)
+            print("[TOPOLOGY] Selected: TRIDENT (3-anchor peer hubs with failover)")
+            print(
+                "[TOPOLOGY] "
+                f"Trident anchors={trident_anchor_count} "
+                f"relay_assist={relay_count} "
+                f"failover_budget={failover_budget}"
+            )
+            return NetworkTopology.TRIDENT
         elif len(self.devices) <= 5 and host_count <= 2:
             print("[TOPOLOGY] Selected: BUS (balanced redundancy)")
             return NetworkTopology.BUS

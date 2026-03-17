@@ -9,7 +9,7 @@ Transform individual mobile data plans into shared, cost-efficient group connect
 ./scripts/blueshare_init.sh
 
 # Create a network
-./scripts/create_network.sh --topology=star --duration=3600
+./scripts/create_network.sh --topology=trident --duration=3600
 
 # Join existing network
 ./scripts/join_network.sh --network-id=<network_id>
@@ -20,6 +20,13 @@ Transform individual mobile data plans into shared, cost-efficient group connect
 - **Mobile Hotspot** for internet connectivity sharing  
 - **Lightning Network** for instant microtransactions
 - **Node-Zero** for privacy-preserving usage tracking
+
+## Topologies
+- **star**: Single host for small groups (up to 3 devices)
+- **bus**: Daisy chain style routing for compact groups with light redundancy
+- **mesh**: Distributed multi-host routing for large host-rich groups
+- **trident**: Three anchor hubs (host/relay with strong RSSI) with deterministic failover
+- **hybrid**: Dynamic switching when no static topology is optimal
 
 ## OBINexus Integration
 - **Division**: OBINexus Computing

@@ -32,6 +32,7 @@ typedef enum {
     TOPOLOGY_STAR,      // Single host, multiple clients
     TOPOLOGY_BUS,       // Daisy chain with failover
     TOPOLOGY_MESH,      // Distributed multi-host
+    TOPOLOGY_TRIDENT,   // 3 anchor hubs with deterministic failover
     TOPOLOGY_HYBRID     // Dynamic switching
 } network_topology_t;
 
@@ -199,6 +200,46 @@ uint8_t verify_network_consensus(blueshare_session_t *session) {
 // ============================================================================
 
 /**
+ * Count devices that can act as trident anchor hubs.
+ *
+ * Trident requires low-latency hubs, so only HOST/RELAY devices with
+ * RSSI >= -80 dBm are considered anchor candidates.
+ */
+size_t count_trident_anchor_candidates(device_node_t *devices, size_t *relay_count) {
+    size_t anchor_count = 0;
+    *relay_count = 0;
+
+    device_node_t *current = devices;
+    while (current != NULL) {
+        if (current->role == ROLE_RELAY) {
+            (*relay_count)++;
+        }
+
+        if ((current->role == ROLE_HOST || current->role == ROLE_RELAY) && current->rssi >= -80) {
+            anchor_count++;
+        }
+
+        current = current->next;
+    }
+
+    return anchor_count;
+}
+
+/**
+ * Trident failover policy:
+ * - Maintain three active anchor hubs (A/B/C).
+ * - Any one anchor can fail with no topology switch.
+ * - If relays are present, one extra failover hop is budgeted.
+ */
+size_t trident_failover_budget(size_t anchor_count, size_t relay_count) {
+    if (anchor_count < 3) {
+        return 0;
+    }
+
+    return (anchor_count - 1) + (relay_count > 0 ? 1 : 0);
+}
+
+/**
  * Determine optimal topology based on device count and capabilities
  */
 network_topology_t determine_topology(size_t device_count, device_node_t *devices) {
@@ -206,13 +247,19 @@ network_topology_t determine_topology(size_t device_count, device_node_t *device
     
     // Count hosts (devices willing to share connection)
     size_t host_count = 0;
+    size_t relay_count = 0;
     device_node_t *current = devices;
     while (current != NULL) {
         if (current->role == ROLE_HOST) {
             host_count++;
         }
+        if (current->role == ROLE_RELAY) {
+            relay_count++;
+        }
         current = current->next;
     }
+
+    size_t anchor_count = count_trident_anchor_candidates(devices, &relay_count);
     
     if (host_count == 0) {
         printf("[TOPOLOGY] ERROR: No hosts available\n");
@@ -223,6 +270,11 @@ network_topology_t determine_topology(size_t device_count, device_node_t *device
     if (device_count <= 3 && host_count == 1) {
         printf("[TOPOLOGY] Selected: STAR (optimal for small network)\n");
         return TOPOLOGY_STAR;
+    } else if (device_count >= 6 && device_count <= 12 && host_count >= 2 && anchor_count >= 3) {
+        printf("[TOPOLOGY] Selected: TRIDENT (3-anchor peer hubs, deterministic failover)\n");
+        printf("[TOPOLOGY] Trident anchors: %zu | relay assist: %zu | failover budget: %zu\n",
+               anchor_count, relay_count, trident_failover_budget(anchor_count, relay_count));
+        return TOPOLOGY_TRIDENT;
     } else if (device_count <= 5 && host_count <= 2) {
         printf("[TOPOLOGY] Selected: BUS (balanced redundancy)\n");
         return TOPOLOGY_BUS;
@@ -498,7 +550,8 @@ int main() {
     printf("Topology: %s\n", 
            session.topology == TOPOLOGY_STAR ? "STAR" :
            session.topology == TOPOLOGY_MESH ? "MESH" :
-           session.topology == TOPOLOGY_BUS ? "BUS" : "HYBRID");
+           session.topology == TOPOLOGY_BUS ? "BUS" :
+           session.topology == TOPOLOGY_TRIDENT ? "TRIDENT" : "HYBRID");
     printf("Devices: %zu\n", session.device_count);
     printf("Total Bandwidth: %.2f Mbps\n", session.total_bandwidth_mbps);
     printf("Fair Share: %.2f Mbps/device\n", session.fair_share_mbps);
