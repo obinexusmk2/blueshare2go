@@ -15,6 +15,17 @@ Transform individual mobile data plans into shared, cost-efficient group connect
 ./scripts/join_network.sh --network-id=<network_id>
 ```
 
+
+## Build
+Canonical build path is **CMake**.
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+Deprecated: `blueshare/build.sh` uses an ad-hoc GCC flow for legacy prototypes and is not the supported root build path.
+
 ## Architecture
 - **Bluetooth LE** for device discovery and coordination
 - **Mobile Hotspot** for internet connectivity sharing  
